@@ -1,0 +1,17 @@
+### lolololologfile ###
+-> 누군가 PDF 파일을 삭제함
+-> 이를 복구하고 flag 찾기
+
+*PDF의 시그니처: 25 50 44 46
+
+Q) 바이너리 분석해서 Data 찾는 것?
+-> $LogFile, $UsnJrnl 추출해서 어떤 PDF가 삭제됐는 지 찾자.
+-> 이게 맞을듯
+-> 아니었음 ..
+
+Q) FTK Imager로 찾는 것?
+-> FTK Imager에서 먼저 삭제된 걸 찾았음
+-> 그래서 추출해봤는데 empty 파일임.
+-> unallocated로 갔더니 똑같은 크기의 파일들이 있었음
+-> FTK Imager에서 보였던 애들이 여기 있었던 것임
+-> 애네들을 합치니까 FLAG 나옴
