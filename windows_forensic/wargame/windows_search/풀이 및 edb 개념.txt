@@ -17,6 +17,24 @@
 -> 파일과 콘텐츠를 인덱싱 (파일 이름, 경로, 내용, 메타데이터) 하여 빠른 검색 가능하게함
 -> 시간이 지남에 따라 파일의 크기 매우 커질 수 있음 (특히, 많은 파일이 있는 경우 자주 검색되는 파일에 대해 인덱스가 자주 업데이트 되는 경우에 발생)
 
+* 파일 크기 줄이기
+1. 디스크 정리를 통해 크기 줄이기
+STEP 1) Windows + R -> cleanmgr -> Enter
+STEP 2) 시스템 드라이브 선택
+STEP 3) "시스템 파일 정리" 버튼을 클릭하여 관리자 권한으로 실행
+STEP 4) "Windows 검색" 항목 선택하고 삭제
+
+2. 인덱스 재구성
+STEP 1) 제어판 -> 인덱스 옵션
+STEP 2) "고급" 버튼 클릭
+STEP 3) "새로 만들기" 버튼을 눌러 인덱스 재구성
+
+3. 인덱스 크기 제한 변경
+STEP 1) Windows + R -> regedit -> Ender
+STEP 2) HKLM\SOFTWARE\Microsoft\Windows Search
+STEP 3) DataDirectory 키 수정해 저장 위치 변경
+STEP 4) 시스템 재부팅
+
 -> 폴더 정보는 SystemIndex_Gthr 테이블에 존재 (부모 폴더 ID를 Parent 칼럼에 저장, 각 폴더의 고유 ID를 Scope 칼럼에 저장)
 -> 파일 정보는 SystemIndex_FthrPth 테이블에 존재 (ScopeID 칼럼에 저장된 ID는 폴더 Scope 칼럼과 동일)
 "이를 통해 파일이 어떤 폴더에 매칭되는 지 알 수 있음."
@@ -27,9 +45,6 @@
 "WinSearchDBAnalyzer 도구 구현"
 
 -> 해당 edb를 통해 많은 파일들에 대한 정보 복구 가능!
-
-
-
 
 # 접근 #
 STEP 1) SQLite DB로 열어본다.
