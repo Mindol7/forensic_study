@@ -1,0 +1,129 @@
+### Windows 아티팩트 정리 ###
+
+## 들어가며 ##
+-> Windows 아티팩트 전반에 대해 살펴보기.
+
+## Windows 아티팩트 ##
+
+# 다양한 Windows 아티팩트 #
+1. Windows Notification
+-> 알림 정보에서 사용자가 사용하는 프로그램, 기기, 애플리케이션에서 발생한 이벤트를 알아낼 수 있다.
+
+"%USERPROFILE%\AppData\Local\Microsoft\Windows\Notifications\appdb.dat"
+"%USERPROFILE%\AppData\Local\Microsoft\Windows\Notifications\wpndatabase.db"
+
+2. Windows Timeline
+-> Windows+Tab으로 실행 가능
+-> 사용자의 시간별 행위를 타임라인 형태로 보여줌 (어느 시각에 무엇을 했는가, 어던 파일을 수정했는가. 다른 기기와 동기화도 하여 다른 기기 사용 여부 알 수 있음)
+-> 사용자 행위 정보를 얻을 수 있음
+-> 최대 30일까지의 사용자 행위 보관 가능. (사용자가 실행하고 있는 응용 프로그램 및 과거에 실행했던 응용프로그램을 보관)
+
+"%USERPROFILE%\AppData\Local\ConnectedDevicePlatform\<id>\ActivitiesCache.db"
+
+3. Volume Shadow Copies
+-> Windows에서 백업을 위한 복사본을 만드는 것
+-> 볼륨 쉐도우 카피 파일에는 해당 시점에 대한 파일 시스템 내 모든 디렉터리와 파일 존재.
+-> 분석 대상 시점과 유사한 시기의 백업이 존재한다면 많은 정보를 얻어낼 수 있음.
+-> ShadowCopyView와 같은 전용 도구 이용해서 분석 필요.
+
+4. 바로가기 목록
+-> Windows에서는 사용자가 열거나 생성한 파일에 대해서 바로가기를 생성함. (확장자: .lnk)
+-> 해당 파일의 존재를 통해 사용자가 언제 파일을 열거나 생성했는 지를 알 수 있음.
+-> LECmd 도구를 통해 분석 가능
+
+"%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Recent\"
+"%USERPROFILE%\AppData\Roaming\Microsoft\Office\Recent\"
+
+5. Jumplists
+-> Windows에서 설치된 여러 프로그램에서 접근한 최근 파일들을 확인할 수 있는 아티팩트
+-> "프로그램에서 접근한 파일."
+
+"%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\"
+"%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations\"
+
+6. Shellbags
+-> 파일 탐색기를 통해 폴더를 볼 때의 기본적인 설정 값들을 저장
+-> Ex) 이름, 수정한 날짜, 유형, 크기, 정렬 방법, 보기 방법
+-> 폴더를 최초로 열람할 때 생성됨. (폴더를 새롭게 생성하거나 복사할 때도 생성)
+-> 파일이나 폴더가 삭제되더라도 남으므로 어떤 파일이나 폴더가 존재했는 지 알 수 있음 (추적 용이)
+
+"HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\Bags"
+"HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\BagMRU"
+"HKCU\Software\Microsoft\Windows\Shell\Bags"
+"HKCU\Software\Microsoft\Windows\Shell\BagsMRU"
+
+7. 기타 아티팩트
+- Thumnails: 이미지에 대한 미리보기 사진들이 저장된 아티팩트
+- BAM(Background Activity Moderator): 사용자별 실행한 애플리케이션과 실행 시각이 저장된 아티팩트
+- SRUM(System Resource Usage Monitor): 프로세스에 의해 사용된 시스템 자원을 모니터링하는 아티팩트. 실행한 프로세스의 이름과 경로, 사용자 등 정보 확인 가능
+- Recent Apps: 최근 실행된 애플리케이션 이름, 실행 시각을 알 수 있는 아티팩트
+- Scheduled tasks: 정해진 시간에 실행되는 작업 목록을 확인할 수 있는 아티팩트
+- Microsoft Store: Microsoft Store로 다운로드 받은 목록을 알 수 있는 아티팩트
+
+## 자료 소개 ##
+"아티팩트가 많기 때문에 분석 목적에 맞게 적절한 아티팩트를 찾아야함" 
+
+1. SANS, Windows Forensic Analysis 포스터
+-> 분석하고자 하는 것에 대해 방향성을 잘 잡아줌.
+
+2. Gitbook, Windows Forensic Handbook
+-> 아티팩트를 출처 별로, 사용자 행위 별로 확인 가능
+https://github.com/Psmths/windows-forensic-artifacts
+https://psmths.gitbook.io/windows-forensics
+-> 아티팩트에 대한 경로와 분석 방법 소개 (분석 시간 단축 가능)
+
+-> Windows 버전 별 아티팩트 존재 여부
+-> 아티팩트 경로
+-> 아티팩트 분석 방법 및 획득 가능한 데이터 목록
+-> 아티팩트 분석 방법 예시
+-> 브라우저 아티팩트의 종류는 다양하지 x (Firefox만 있음)
+
+3. Available Artifacts - Evidence of Execution
+-> 생성되는 아티팩트의 종류는 Windows 버전에 따라 조금씩 달라짐.
+-> 해당 자료에서는 Windows 버전 별로 특정 아티팩트가 존재하는지 여부를 알려줌. (단 마지막 업데이트가 2018년이라 부정확할 수 있음.)
+
+## 마무리 ##
+-> 실험을 통해 아티팩트가 어떤 조건에서 생성되는지, 생성된 아티팩트에서는 어떤 데이터가 남는 지 확인해보는 것도 가치 있는 일임.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

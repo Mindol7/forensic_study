@@ -1,0 +1,173 @@
+### 레지스트리 ### ; 시스템 설정 데이터 획득 가능
+-> Windows 아티팩트 공부
+-> 아티팩트: 생성 증거 중에서 일정한 구조가 있는 것
+* 보관 증거: 사람이 직접 작성한 데이터
+* 생성 증거: 자동으로 생성된 증거 (사람 개입 x)
+
+-> 조각난 정보임
+
+1. 사용자 행위에 따라 생성되는 아티팩트 차이 확인
+Ex) A행동하고 A'행동에서 같은 아티팩트 생성되는지? 다른 아티팩트 생성되는지?
+2. 윈도우 운영체제는 어딘가에 저장된 정보를 이용해 기능을 제공하고,
+   결과를 어딘가에 저장할 것임.
+-> 내부적으로 어떤 DB/설정 파일에서 정보 가져오는지, 결과 어디에 저장하는지 확인
+
+*레지스트리: 윈도우 운영체제의 계층형 DB (사용자, 시스템, 프로그램 실행 관련 설정)
+-> 시스템 정보, 사용자 계정, 환경 변수 등 확인 가능
+-> 기본 정보, 시간 정보, 실행 흔적, USB 연결 흔적 등 분석 가능
+
+"HKML\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+-> 설치된 윈도우 버전, 사용자 정보
+
+## 레지스트리 루트 키 ##
+-> 5개의 루트 키 존재.
+
+1. HKEY_CLASSES_ROOT (HKCR) ; 파일 확장자 연결 정보, COM 객체 등록 정보
+2. HKEY_CURRENT_USER (HKCU) ; 현재 시스템에 로그온 되어있는 사용자 정보
+-> 주요 사용자 정보 많음
+3. HKEY_LOCAL_MACHINE (HKLM) ; 시스템의 HW, SW, 기타 설정 정보
+-> 주요 사용자 정보 많음
+4. HKEY_USERS (HKU) ; 시스템의 모든 사용자 정보와 그룹에 관한 프로파일 정보
+5. HKEY_CURRENT_CONFIG (HKCC) ; 시스템이 시작될 때 사용되는 하드웨어 프로파일 정보
+
+=> 루트 키들이 서로 독립적이지 않음
+
+# TIMEZONE #
+"HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation"
+-> 현재 시스템의 Timezone을 알아낼 수 있음
+-> 이 중 Bias 값 현재 시스템 시간과 UTC 시간 차이 알 수 있음 (분 단위)
+
+# SYSTEM INFO #
+"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+-> 현재 시스템의 다양한 정보 알 수 있음
+
+* 원본 데이터로 부터의 값은 Little-Endian
+* 레지스트리 편집기와 같은 도구로 획득한 값은 Big-Endian
+
+# Autoruns #
+-> 프로그램 실행될 때 자동으로 실행되는 프로그램
+Ex) 악성코드가 해당 경로에 넣어두고 컴퓨터 재부팅마다 되살아남
+"HKLM\SOFTWARE\Microsoft\Windows\Currentversion\Run" (RunOnce, RunOnceEx)
+"HKCU\SOFTWARE\Microsoft\Windows\Currentversion\Run" (RunOnce, RunOnceEx)
+
+# 사용자 계정 #
+-> 시스템에 존재하는 모든 사용자 목록 확인 가능
+"HKLM\SOFTWARE\Microsoft\Windows NT\ProfileList"
+
+*시스템 계정
+- "S-1-5-18" : systemprofile
+- "S-1-5-19" : LocalService
+- "S-1-5-20" : NetworkService
+
+*사용자 계정
+- "S-1-5-21-31232312~~~"
+
+*SID : Windows 시스템에서 사용자 별로 고유하게 부여되는 ID 값
+- 500(관리자), 501(게스트), 1000이상(일반 사용자 계정)
+
+* LocalProfileLoadTimeHigh & LocalProfileLoadTimeLow 조합해서 사용자 계정의 최종 로그온 시간 구하기 가능
+
+* LocalProfileUnloadTimeHigh & LocalProfileUnloadTimeLow 조합해서 사용자 계정의 최종 로그오프 시간 구하기 가능
+
+Ex) High: 0x01da7a06, Low: 0x34dc09ea -> 0x01da7a0634dc09ea
+
+# 환경 변수 #
+-> 악성코드에서 스크립트 실행 때 환경 변수에 특정 값 숨겨놓는 경우 존재
+
+* 사용자 계정 환경 변수
+-> "HKCU\Environment"
+
+* 시스템 환경 변수
+-> "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+
+# 기기 연결 흔적 #
+-> 사용자의 타임라인 분석 가능
+Ex) USB로 악성코드 유포, 기밀 유출, 다른 저장장치에 옮기고 기존 저장장치 숨김
+-> USB 제품명, 시리얼 번호, 최초 연결 시각, 마지막 연결 시각 알 수 있음
+
+-> "HKLM\SYSTEM\ControlSet00?\Enum\USB"
+-> "HKLM\SYSTEM\ControlSet00?\Enum\USBSTOR"
+-> "HKLM\SOFTWARE\Microsoft\Windows Portable Devices\Devices"
+	- 시스템에 마운트된 볼륨 확인 가능
+-> "C:\Windows\INF\setupapi.dev.log"
+
+* USB 제품 ID와 제품 ID (VID, PID)
+-> VID와 PID 일치하는 제품 USB 확인 가능
+
+
+## 레지스트리 수집 방법 ##
+-> 여러 경로로 나뉘어져있음 (볼륨에서)
+-> "C:\Users\[UserName]\NTUSER.DAT"
+-> "C:\Users\[UserName]\AppData\Local\Microsoft\Windows\UsrClass.dat"
+-> "C:\Windows\System32\config\DEFAULT"
+-> "C:\Windows\System32\config\SAM"
+-> "C:\Windows\System32\config\SECURITY"
+-> "C:\Windows\System32\config\SOFTWARE"
+-> "C:\Windows\System32\config\SYSTEM" ; USB 관련한 로그가 기록되어있음
+
+-> 레지스트리 파일은 시스템 파일 (즉, 시스템이 동작하고 있을 때 일반적인 방법으로 복사 x)
+-> 그러므로 FTK Imager에서 디스크 이미지를 root 경로에 별도로 저장
+-> .LOG1, .LOG2에 같이 복사 필요 (트랜잭션 데이터를 저장)
+-> 해당 파일들을 RLA 도구로 통합
+
+* Registry Explorer
+* Regripper
+
+### Basic_Forensic ###
+-> 스테가노그래피 ; 픽셀의 LSB를 수정하여 데이터를 숨김
+-> 사람 입장에서는 LSB의 변화를 인지하기는 쉽지 않음
+
+### Snowing ###
+https://georgeom.net/StegOnline/checklist (스테가노그래피 체크 리스트) 
+-> 스테가노그래피는 아니고 ..
+-> HxD에도 크게 의미있는게 없고 ..
+-> 어떤게 있을까ㅏㅏㅏ?
+
+1. strings
+2. File 속 File (시그니처 이용)
+3. 픽셀 조정
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

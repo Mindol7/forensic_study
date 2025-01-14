@@ -1,0 +1,41 @@
+### Windows Search ###
+## EDB 확장자 (용도에 따라 의미가 달라짐) ##
+1. Microsoft Exchange Database
+-> 이메일, 일정, 연락처 등을 저장하는 데이터베이스
+
+2. Windows Search Index Database
+-> 파일의 검색 속도를 높이기 위해 인덱스 데이터 저장
+"C:\ProgramData\Microsoft\Search\Data\Applications\Windows" 에 저장
+
+3. Third-Party Applications
+-> 일부 소프트웨어는 자체 데이터베이스 파일로 사용
+
+=> 데이터베이스 파일이므로 텍스트 편집기로 열리지 않음
+=> 적절한 소프트웨어나 데이터베이스 관리 도구 사용 필요
+
+# Windows Search Index Database 분석 #
+-> 파일과 콘텐츠를 인덱싱 (파일 이름, 경로, 내용, 메타데이터) 하여 빠른 검색 가능하게함
+-> 시간이 지남에 따라 파일의 크기 매우 커질 수 있음 (특히, 많은 파일이 있는 경우 자주 검색되는 파일에 대해 인덱스가 자주 업데이트 되는 경우에 발생)
+
+-> 폴더 정보는 SystemIndex_Gthr 테이블에 존재 (부모 폴더 ID를 Parent 칼럼에 저장, 각 폴더의 고유 ID를 Scope 칼럼에 저장)
+-> 파일 정보는 SystemIndex_FthrPth 테이블에 존재 (ScopeID 칼럼에 저장된 ID는 폴더 Scope 칼럼과 동일)
+"이를 통해 파일이 어떤 폴더에 매칭되는 지 알 수 있음."
+
+-> 파일에 대한 상세정보는 SystemIndex_PropertyStore에 저장. 
+(테이블에서 파일에 대한 수정, 삭제, 생성 시간 뿐만 아니라 경로, 파일 내용, 확장자, 분류, 권한, 크기 제공)
+-> 파일 내용은 System_Search_AutoSummary 칼럼에 기록. (주요 부분만 파싱해 분석 속도 향상해야함)
+"WinSearchDBAnalyzer 도구 구현"
+
+-> 해당 edb를 통해 많은 파일들에 대한 정보 복구 가능!
+
+
+
+
+# 접근 #
+STEP 1) SQLite DB로 열어본다.
+STEP 2) 분석해본다
+-> 안됨.
+
+# 풀이 #
+STEP 1) WinSearchDBAnalyzer로 해당 파일 열기
+STEP 2) flag.txt 검색
