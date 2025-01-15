@@ -5,3 +5,8 @@ STEP 1) /etc/passwd를 보니까 frank 이 놈한테 문제가 많음
 STEP 2) 해당 디렉토리로 가서 보니까 .secret_log가 있음
 STEP 3) DH만 보려니까 바이너리라 안된다고 함
 STEP 4) 그래서 grep -a 명령어로 문자열로 변환해서 보니까 flag 나옴
+
+*깨달은점
+1. /frank/bash.sh을 열어보니까 >, tee로 표준 에러를 표준 출력을 리다이렉션해서 .secret_log에 저장하고 있음
+2. tee (파이프라인 하면서 파일로 저장)
+3. /bin/bash 2>&1 ; 표준 에러를 표준 출력으로 리다이렉션함.
