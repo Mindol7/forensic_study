@@ -1,0 +1,122 @@
+### 시스템 정보 확인 ###
+
+## 들어가며 ##
+-> Linux 시스템에서 시스템의 기본 정보 파악하는 방법.
+-> GUI 기반이 아니기에 명령어 기반으로 모든 정보 수집해야함
+-> 운영체제 정보, 디스크 파티션 확인, 저장장치 마운트 확인, 네트워크 설정 확인 등 ..
+
+## 시스템 접속 ##
+-> ssh를 통해 많이 함.
+
+# SSH 실습 #
+-> 가상 머신을 통한 실습 (호스트와 게스트 개념 존재.)
+-> 호스트: 원래 사용하던 컴퓨터 / 게스트: 가상 머신을 통해 설치된 컴퓨터 (내 환경에서는 host: windows, guest: ubuntu)
+-> Bridged 모드: 호스트와 게스트가 같은 네트워크에 연결되는 모드 (별도의 네트워크 설정 없이 통신 가능)
+-> NAT 모드: 호스트가 별도의 사설망을 만들어 게스트가 이용할 수 있도록 함. (호스트가 공유기 역할. 통신을 위해서는 별도의 포트 포워딩 필요.)
+
+*실습에서는 Bridged 모드 사용
+STEP 1) Player -> Virtual Machine Settings로 이동
+STEP 2) Network Adapter -> Bridged로 설정
+STEP 3) 이후, 게스트에서 IP 주소 확인 ; ip addr -> inet 뒤에 나오는 주소가 IP 주소임. (network 설정을 automatic말고 intel로 해야 잘됨.) 
+STEP 4) sudo apt install -y openssh-server로 SSH 서버 설치 
+STEP 5) sudo systemctl status ssh로 실행 상태 확인 (active면 정상적으로 실행되고 있는 것임)
+STEP 6) 호스트에서 게스트로 SSH 연결
+- ssh [ID]@[IP] -p[포트]
+- ssh root@IP -p[포트] ; IP인 root 계정에 지정 포트로 접속
+- ssh minhyuk@IP ; IP인 minhyuk 계정에 기본 포트 22로 접속
+
+## 시스템 확인 ##
+-> lsb_release -a ; 운영체제 버전 확인 명령어
+
+# 디스크 파티션 확인 명령어 #
+-> 디스크 연결 순서에 따라 /dev/sda, /dev/sdb, /dev/sdc라고 부름. (각 디스크에 존재하는 파티션은 디스크 이름에 따라 sda1, sda2, sda3 ... 라고 부름.)
+-> sudo fdisk -l
+
+# 파일 시스템 사용가능한 공간 표시해주는 명령어 #
+*마운트: 파일시스템을 특정 디렉토리 형태로 접근할 수 있도록 연결해주는 것.
+-> df -h
+
+# 시스템 버전과 CPU 정보 확인 명령어 #
+-> cat /proc/version
+-> cat /proc/cpuinfo
+
+# 시스템이 실행된 이후 지속시간, 현재 접속 중인 사용자 수 출력 명령어 #
+-> 순서대로 현재 시간, 시스템 지속 시간, 현재 접속 중인 사용자 수, CPU 평균 부하율
+-> uptime
+
+## 사용자 확인 ##
+-> 시스템에 존재하는 사용자 정보를 /etc/passwd 파일에 저장함. (사용자 계정 정보만 저장)
+-> cat /etc/passwd
+-> username | password(패스워드 저장 필드, 현재 사용되지 않아 x) | uid | gid | comment(계정과 관련된 정보) | home_dir(계정의 홈디렉토리) | login_shell(계정이 로그인하기 위해 사용하는 프로그램)
+
+*UID와 GID
+-> root 계정은 uid가 0, 일반 사용자 1000부터 차례대로 할당
+-> UID 1000미만은 예약된 시스템 계정에서 이용
+
+# 패스워드 해시 확인 #
+-> 실제 패스워드는 해시값으로 저장.
+-> cat /etc/shadow
+-> username | password (해시화된 패스워드, !는 패스워드 설정x, *는 패스워드 로그인 불가능.) | lastchanged (UTC 기준일로 경과된 일수) | minimum | maximum | warn | -
+-> $id값에서 해시 알고리즘을 나타냄. (1은 MD5, 2는 Blowfish, 5는 SHA-256, 6은 SHA-512, y는 yescrypt)
+-> $id$salt$hash / $id$param$salt$hash 중 하나의 형식을 가짐
+
+## 그룹 확인 ##
+-> cat /etc/group
+-> groupname | password | gid | users (해당 그룹에 포함된 모든 유저들 나열)
+
+## root 권한 확인 ##
+-> /etc/sudoers 파일에 허용된 사용자에 대해서만 sudo 명령어 실행 가능.
+-> sudo cat /etc/sudoers
+
+## 네트워크 확인 ##
+-> 시스템이 사용하고 있는 네트워크 인터페이스 (lo, ens33), IP 주소 역시 반드시 확인 필요.
+-> ip address
+
+## 라우팅 테이블 확인 ##
+-> 목적지에 도달하기 위한 네트워크 노선 (from A to B)
+-> default: 기본 라우팅 주소
+-> link 범위가 있음
+
+## ARP 캐시 확인 ##
+-> ARP (Address Resolution Protocol)
+-> IP 주소와 물리적인 MAC 주소를 서로 연결하기 위한 프로토콜
+-> PC는 ARP 캐시를 통해 IP 주소에 대응하는 MAC 주소 알아냄.
+-> ip neigh 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
