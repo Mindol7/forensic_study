@@ -1,0 +1,353 @@
+### 시스템 로그 분석 ###
+
+## 들어가며 ##
+-> Linux 시스템에 생성되는 시스템 로그 분석
+-> 사용자 로그인, 시스템 재부팅 등 사용자 행위에 따라 자동으로 생성되는 로그 존재.
+
+## 시스템 로그 분석 ##
+
+# 시스템 로그 경로 #
+-> /var 폴더에 시스템 로그 저장 (가변 데이터 파일도 있긴함)
+
+- /boot: 리눅스 커널이 저장되는 폴더
+- /usr: 프로그램이 설치되는 폴더
+- /dev: 시스템의 디바이스 목록과 정보 저장되는 폴더
+- /proc: 시스템의 프로세스 정보 확인할 수 있는 폴더
+
+-> /etc/rsyslog.conf 파일에 /var에 대한 설정 값 저장됨. (설정 정보)
+- 파일의 소유자, 그룹, 권한 설정하고 로그를 임시 저장하기 위한 공간은 /var/spool/rsyslog 이용.
+- 추가적인 설정은 /etc/rsyslog.d/*.conf 를 통해 이루어짐. (추가 설정 정보)
+
+* /etc/rsyslog.d/*.conf 분석
+-> 활성화할 시스템 로그 종류 선택 (/var/log에 저장되는 모든 로그가 이 파일로 관리되는 것은 아님.)
+
+# 실습을 위한 과정 #
+STEP 1) 모든 로그 활성화하기 위해 로그에 대한 주석 삭제
+STEP 2) sudo systemctl restart syslog 을 통해 로그 시승템 재시작
+STEP 3) 시스템 재부팅 후 /var/log 폴더에 활성화한 로그 생성되는지 확인
+
+# 시스템 로그 #
+- /var/run/utmp: 현재 시스템에 로그인하고 있는 사용자 정보
+- /var/log/btmp: 사용자가 시스템에 로그인 실패한 정보
+- /var/log/wtmp: 사용자가 시스템에 로그인한 기록 및 시스템 재부팅 기록
+- /var/log/lastlog: 사용자가 시스템에 마지막으로 로그인 성공한 기록
+- /var/log/messages: 시스템 전반에 대한 로그를 기록
+- /var/log/auth.log, /var/log/secure: 원격 로그인 및 권한 상승에 대한 성공 및 실패를 기록
+- /var/log/dmesg: 시스템 부팅 과정에서 생성되는 커널 메시지 로그를 기록
+- /var/log/cron.log: cron 작업에 대한 로그 (*cron: 리눅스에서의 주기적 반복 작업을 처리하는 스케줄러 프로그램)
+- /var/log/boot.log: 운영체제 부팅 과정에서 생성되는 로그를 기록
+- /var/log/daemon.log: 실행 중인 데몬의 정보 기록
+- /var/log/user.log: 시스템 내 모든 사용자에 대한 로그가 기록.
+
+-> utmp, btmp, wtmp, lastlog는 사용자 로그인과 관련된 정보 기록. (바이너리 데이터)
+- utmp의 경우 w, who 명령어로 해석 (tty는 콘솔을 통해 직접 접속, pts는 ssh나 telnet 등으로 원격 접속)
+- btmp의 경우 lastb 명령어로 해석 (로그인 실패 로그)
+- wtmp의 경우 last 명령어로 해석 (로그인한 기록 및 재부팅한 기록)
+- lastlog의 경우 lastlog 명령어로 해석 (사용자가 시스템에 마지막으로 로그인 성공한 기록 로그)
+
+# logrotate #
+-> 크기가 커지는 로그의 양을 관리하기 위해 등장
+-> 이전 로그 파일을 백업하거나 압축해서 보관하고 새로운 로그 파일을 생성하는 구조. (로그를 회전한다 ...)
+-> 로그 회전 이전: messages | 로그 회전 이후: messages.1
+-> crontab에 등록되어 실행해 기본적으로 하루에 1번씩 스크립트 실행. (/etc/cron.daily/logrotate)
+-> 실행될 때는 /etc/logrotate.conf 설정 파일 참고.
+-> logrotate -f /etc/logrotate.conf && ls -l
+
+## 웹 로그 분석 ##
+# 웹 로그 #
+-> 서버가 제공하고 있는 웹 페이지에 대한 접근 기록은 웹 로그에 저장. (웹 서버는 Apache, Nginx, IIS, LiteSpeed)
+-> /var/log/apache2 (Ubuntu), /var/log/httpd (CentOS)
+- access.log (서버가 처리하는 모든 요청 기록)
+- error.log (서버가 요청 처리하는 도중 발생한 오류를 기록)
+
+# 웹 로그 실습 환경 구축 #
+-> Apache2, MariaDB, PHP 설치
+# apt update
+sudo apt update
+
+# install apache2
+sudo apt install -y apache2
+
+# install mariadb
+sudo apt install -y mariadb-server
+sudo mysql_secure_installation
+
+# install php
+sudo apt install -y php libapache2-mod-php php-mysql
+
+# 설치가 잘 되었는지 확인
+# Apache2는 웹 브라우저 http://localhost 접속
+sudo mysql (최신 버전에서는 sudo mariadb)
+php -v
+
+-> db쉘에서 데이터베이스 구축.
+create database dreamhack; # 데이터베이스 생성
+use dreamhack;             # 생성한 데이터베이스 선택
+
+create table member(       # member 테이블 생성
+	id varchar(10) not null, 
+	pass varchar(100) not null, 
+	name varchar(10) not null, 
+	primary key(id) 
+);
+
+insert into member values('guest', 'guest', 'guest');  # 테이블에 값 추가
+insert into member values('root', 'veryverylongpassworditis', 'root');
+
+select * from member;      # member 테이블 값 조회
+
+-> 설정한 환경 기반으로 웹 페이지 만들기
+
+1. index.php
+-> 로그인 세션이 없을 경우 login.php 이동.
+-> 로그인 세션이 있을 경우 메인 페이지 보여줌.
+<?php
+session_start();
+if(!isset($_SESSION['username'])) {
+    echo "<script>location.replace('login.php');</script>";            
+}
+
+else {
+    $username = $_SESSION['username'];
+    $name = $_SESSION['name'];
+} 
+?>
+<body>
+    <div class="base">
+        <h2><?php echo "Hi, $username($name)";?></h2>
+        <button type="button" class="btn" onclick="location.href='logout.php'">
+            LOGOUT
+        </button>
+    </div>
+</body>
+
+2. login.php
+-> 로그인을 검사하는 login_check.php로 사용자가 입력한 id, pw를 전달
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>LOGIN</title>
+</head>
+<body>
+  <form method="post" action="login_check.php" class="loginForm">
+    <h2>Login</h2>
+    <div class="idForm">
+      <input type="text" name="id" class="id" placeholder="Username">
+    </div>
+    <div class="passForm">
+      <input type="password" name="pw" class="pw" placeholder="Password">
+    </div>
+    <button type="submit" class="btn" onclick="button()">
+      LOGIN
+    </button>
+    <div class="bottomText">
+      <a href="#">Sign up</a>
+    </div>
+  </form>
+</body>
+</html>
+
+3. login_check.php
+-> 전달 받은 id, pw를 db에서 조회해 검사
+
+<!DOCTYPE html>
+<html>
+<head>
+   <meta charset="utf-8">
+   <title></title>
+</head>
+<body>
+   <?php
+   session_start();
+   $host = 'localhost';
+   $user = '';              // mariadb 사용자 이름 입력
+   $pw = '';                // mariadb 패스워드 입력
+   $db_name = '';           // mariadb에 미리 구축해둔 데이터베이스 이름 입력
+   $mysqli = new mysqli($host, $user, $pw, $db_name); // mariadb 연결
+
+   $username = $_POST['id'];       // 사용자로부터 입력 받은 id
+   $userpass = $_POST['pw'];       // 사용자로부터 입력 받은 pw
+      
+   $q = "SELECT * FROM member WHERE id = '$username' AND pass = '$userpass'";
+   $result = $mysqli->query($q);
+   $row = $result->fetch_array(MYSQLI_ASSOC);
+      
+   // DB에 데이터가 존재하면 세션을 생성함
+   if ($row != null) {
+      $_SESSION['username'] = $row['id'];
+      $_SESSION['name'] = $row['name'];
+      echo "<script>location.replace('index.php');</script>";
+      exit;
+   }
+      
+   // DB에 데이터가 존재하지 않으면 세션 생성 실패, 로그인 페이지로 돌아감
+   if($row == null){
+      echo "<script>alert('Invalid username or password')</script>";
+      echo "<script>location.replace('login.php');</script>";
+      exit;
+   }
+   ?>
+</body>
+
+4. logout.php
+-> 세션을 종료하고 메인 페이지로 이동
+<?php
+session_start();
+session_destroy();
+?>
+<script>
+    location.replace('index.php');
+</script>
+
+# access.log 분석 #
+-> /var/log/apache2/access.log에 있음
+클라이언트 IP 주소 | 접속 요청 시간 | 요청 메소드.요청페이지.프로토콜 및 버전 | 응답 상태 코드 | 응답 바이트 크기 | 이전 페이지의 URL | 클라이언트의 브라우저 정보
+
+*해석
+IP 주소 192.168.0.179에서 [13/Apr/2024:19:49:52 +0900] 시간에 POST 메서드를 이용해 /check_login.php 페이지에 대해 HTTP/1.1 프로토콜로 응답을 보냈습니다.
+
+해당 응답은 상태 코드 200(요청 성공)을 반환했으며, 512 바이트 응답 메시지가 전송되었습니다.
+
+클라이언트의 Referer는 "<http://192.168.0.221/login.php>"이었고, User Agent는 "Mozilla/5.0 (Windows NT ...였습니다.
+
+# error.log 분석 #
+-> /var/log/apache2/error.log에 있음
+오류가 발생한 시간 | 로그 레벨 | 오류가 발생한 프로세스 ID | 클라이언트 IP 주소 | 오류 메시지 내용
+
+*해석
+[Sat Apr 13 20:11:47.811356 2024]에 [php:error] 수준의 에러가 발생하였으며, 에러가 발생한 프로세스 ID는 [pid 1009]입니다.
+
+클라이언트의 IP 주소는 [client 192.168.0.179:51667]이며, 발생한 에러의 내용은 PHP Fatal error: ...입니다.
+
+
+# 웹 공격 분석 실습 #
+-> SQL Injection 도구 sqlmap (SQL Injection 공격을 자동으로 수행해 로그를 빠르게 남길 수 있음)
+
+sqlmap -u "http://192.168.0.221/check_login.php" --data "id=guest&pw=guest"
+
+-> 이후, access.log 분석
+-> 1초 내에 로그 속 요청들이 이루어진 것으로 보아 자동화 도구 사용 판단.
+-> 이후, error.log 분석
+-> 취약점을 공격자가 어떤 방식으로 이용해 서버에 침투했는 지 알아냄. (check_login.php 코드에서 어떤 부분에 에러가 발생했는 지 알려주므로 ...)
+
+## 기타 로그 분석 ##
+
+# .bash_history #
+-> bash 쉘에 입력한 명령어들 저장
+-> cat ~/.bash_history
+
+# .viminfo #
+-> vim 에디터를 이용해 열어 본 파일과 명령어가 저장.
+-> 명령어 실행 흔적
+-> 검색한 문자열 정보
+-> 열어본 파일 역시 확인 가능
+-> cat .viminfo
+
+## 마무리 ##
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

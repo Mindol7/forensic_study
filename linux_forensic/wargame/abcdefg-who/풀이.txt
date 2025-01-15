@@ -1,0 +1,7 @@
+ssh dream@[server IP] -p [port]
+
+# 풀이 #
+STEP 1) /etc/passwd를 보니까 frank 이 놈한테 문제가 많음
+STEP 2) 해당 디렉토리로 가서 보니까 .secret_log가 있음
+STEP 3) DH만 보려니까 바이너리라 안된다고 함
+STEP 4) 그래서 grep -a 명령어로 문자열로 변환해서 보니까 flag 나옴
