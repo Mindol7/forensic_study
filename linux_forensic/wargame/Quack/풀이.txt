@@ -1,0 +1,13 @@
+### Quack 풀이 ###
+-> ssh dream@[server IP] -p [port]
+-> 서버가 해킹 당함
+-> 자꾸 Quack이라는 파일이 생성됨. (id: dream, pw: hack1234)
+
+220.149.255.6.48460 얘와 통신하고 있는듯
+-> cron?
+-> scp로 패킷 분석
+
+
+STEP 1) ps -ef로 cron해서 실행 파일 실행함을 아는데 (통신으로 함)
+STEP 2) tcpdump로 보니까 외부 통신함
+STEP 3) scp로 받아와서 패킷 분석 후 Flag 찾음
