@@ -1,0 +1,23 @@
+### flask-forensics 풀이 ###
+-> 운영 중인 서버가 해킹 당함.
+-> 해커가 서버의 전체 소스코드를 다운로드한 시간 구하기.
+
+*Access Info
+- 첫 번째 주소는 웹 사이트를 호스팅하고 있음. (브라우저 등을 이용해 접근)
+- 두 번째 주소에는 ssh를 이용해 접근
+
+*Flag Info
+-> DH{downloadtTme} ; 다운로드한 시간 Unix Timestamp.
+
+-> /app은 서버 실행 전 소스 코드 담겨 있음.
+-> access.log는 서버 실행에서 발생하는 로그 담고 있음.
+
+## 풀이 ##
+STEP 1) access.log를 보니 웹호스팅 사이트에 계속 무언가 공격 시도를 하는 것 같음.
+STEP 2) 서버에 있는 웹사이트 flask 코드를 보니까 원본 소스코드랑 먼가 다름
+STEP 3) 몇개 다른 것들이 있음
+STEP 4) 특히 some은 tar로 압축을 풀면 소스 코드가 들어있음
+STEP 5) access.log를 분석해보니 path-travel 공격으로 some.tar을 가져오는 것을 확인
+STEP 6) 이때의 시간을 변환해보니 정답이었음.
+
+# Path Travel 공격 #
