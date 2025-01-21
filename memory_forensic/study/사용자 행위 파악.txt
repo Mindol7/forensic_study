@@ -1,0 +1,155 @@
+### 사용자 행위 파악 ###
+
+## 들어가며 ##
+-> 주어진 메모리 덤프 내에서 사용자 행위 파악하기. (Lab2 문제)
+
+## Lab 2 풀이 ##
+
+# 문제 소개 #
+-> "환경적"이라 했으므로 환경 변수 추정.
+-> 브라우저 애플리케이션
+-> 패스워드 관리자 프로그램
+"이 3가지를 통해 중요 정보를 알아내라"
+
+## 프로세스 파악 ##
+-> 운영체제 정보 출력하고, 설정 파일 생성
+
+"python3 vol.py --save-config config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.info > ~/forensic_dreamhack/Lab2/files/info.log"
+- 64비트 운영체제
+- 빌드번호: 7601.17514.amd64fre.win7sp1_rtm.
+- 메모리 덤프가 생성된 시간: 2019-12-14 10:38:46+00:00
+
+-> 프로세스 목록 출력
+
+python3 vol.py -c config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.pslist > ~/forensic_dreamhack/Lab2/files/pslist.log
+
+python3 vol.py -c config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.psscan > ~/forensic_dreamhack/Lab2/files/psscan.log
+
+python3 vol.py -c config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.pstree > ~/forensic_dreamhack/Lab2/files/pstree.log
+
+-> chrome.exe, KeePass.exe는 수상한 프로세스 (Chrome의 경우 메모리 덤프 잘 찾아보면 접속했던 페이지나 사용자 패스워드 획득 가능)
+-> cmd.exe, conhost.exe는 사용자가 콘솔에 명령어 실행하는데 이용되므로 조사해볼 필요 있음.
+-> notepad.exe는 Hidden.kdbx 열고 있으므로 분석 대상.
+
+
+# 환경 변수 분석 #
+python3 vol.py -c config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.envars > ~/forensic_dreamhack/Lab2/files/envars.log
+
+-> 수상하게 생긴 문자열 나와서 (base64 디코딩해보니 Flag나옴) ; 암호화된 것 같은건 (ASCII, Base등 디코딩해보기)
+
+# 브라우저 아티팩트 분석 #
+-> Chrome 메모리 덤프는 매우큼. (아티팩트 보는 것이 더 효율적.)
+-> Chrome은 history 파일에 브라우징 기록을 저장함.
+
+python3 vol.py -c config.json -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.filescan > ~/forensic_dreamhack/Lab2/files/filescan.log
+
+-> 이후, History를 검색 후 파일 추출 (windows.dumpfiles)
+python3 vol.py -c config.json -o ~/forensic_dreamhack/Lab2/Dump -f   ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.dumpfiles --physaddr 0x3fcfb1d0
+
+# 패스워드 관리자 프로그램 분석 #
+-> 프로세스의 메모리 덤프 시도
+
+python3 vol.py -c config.json -o ~/forensic_dreamhack/Lab2/Dump/ -f ~/forensic_dreamhack/Lab2/MemoryDump_Lab2.raw windows.memmap --pid 3008 --dump > ~/forensic_dreamhack/Lab2/files/memmap_3008.log
+
+-> 이후 strings로 문자열만 추출 (평문 문자열이라면 strings로 추출가능) ; 실패
+
+-> 로컬에서 패스워드 파일을 저장할 수 있으므로 filescan에서 검색
+\Users\Alissa Simpson\Pictures\Password.png ; 확인 가능.
+-> 해당 파일 추출
+-> 확장자 변경후 확인. (패스워드: P4SSw0rd_123)
+
+## Lab3 풀이 ##
+-> 악성 스크립트가 시스템에 있는 비밀 파일 암호화
+-> 암호화된 파일을 복호화 필요.
+
+-> 해당 스크립트가 파일 혹은 프로세스 형태로 존재할 것임
+-> 암호화가 수행된 파일이 어딘가에 존재하고, 어딘가에 존재하는 패스워드를 찾아야함.
+
+*찾아야 할 것
+1. 암호화 스크립트 파일 혹은 프로세스
+2. 암호화가 수행된 파일
+3. 암호화 패스워드
+
+## 프로세스 파악 ##
+-> windows.info로 Windows 버전 정보 이용 및 --save-config로 설정 파일 생성
+-> 32비트 시스템
+-> 빌드 버전: 7601.19135.x86fre.win7sp1_gdr.16
+-> 메모리 덤프 생성 시간: 2018-09-30 09:47:54+00:00
+
+이후, 프로세스 생성 (pslist, psscan, pstree)
+
+*분석 대상 프로세스
+- notepad.exe 3개, explorer
+- python.exe (script?)
+- cmd.exe, conhost.exe
+
+-> 탐색기 위에서 notepad가 열림 ! (evilscript.py도 열림)
+
+-> filescan 해서 오프셋 검색 (notepad의 \Users\hello\로 많은 정보 찾아보기)
+
+-> 이후, 3개의 파일(suspision1.jpeg, vip.txt, evilscript.py.py)이 의심스러웠는데 그거 추출 
+-> 스크립트, 메모장, 스테가노그래피 의심 파일 획득
+
+-> 역연산 코드 작성후 절반의 플래그 획득.
+-> 이후, steghide 툴 이용해 플래그 획득 (steghide extract -sf 지정파일)
+
+## 마무리 ##
+-> 사용자 행위를 파악하기 위해서는 문제에서 주어진 시나리오를 항상 생각해야함.
+-> 수상한 프로세스 찾고, 관련된 파일이나 메모리를 덤프하는 일련의 작업들이 모두 시나리오와 관련있는 방향으로 수행.
+-> 경험을 쌓아 분석 방법과 노하우 쌓아야됨.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
