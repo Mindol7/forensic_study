@@ -1,0 +1,29 @@
+### find-the-spy 풀이 ###
+
+## 문제 설명 ##
+-> 내부 기밀을 유출한 혐의를 받고 있는 직원 A에 대해 내부 감사를 진행하고 있음.
+-> A의 PC에서 획득한 메모리 덤프로 부터 A의 혐의를 입증하여 플래그 찾기
+-> 증언: 어떤 압축 파일을 유심히 보는 것 처럼 보였음. 
+
+*FLAG: DH{시간_장소}
+
+STEP 0) 압축 파일을 집중적으로 봐보자.
+STEP 1) 프로세스 파악
+-> 64비트 시스템, 2024-04-27 16:06:46+00:00 시스템 덤프 시간
+STEP 2) 프로세스 수집
+MemCompression
+Everything.exe
+Bandizip.exe
+Notion.exe	
+slack.exe
+KakaoTalk.exe
+
+"C:\Users\darkw\AppData\Local\Programs\Notion\Notion.exe"
+"C:\Users\darkw\Downloads\reports.zip"	C:\Program Files\Bandizip\Bandizip.exe
+10352
+
+STEP 3) 프로세스 파일 봐보기
+-> reports가 수상함
+-> 그래서 zip 압축 해제 시도함
+-> 근데 안됨
+-> HxD로 분석해보니까 마지막에 PNG 숨어있었음
