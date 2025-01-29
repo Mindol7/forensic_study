@@ -1,0 +1,21 @@
+### video-in-video 풀이 ###
+-> 한가위 비디오를 찾아야함
+-> flag 형식: BISC{}
+-> 이미지 파일 하나 주어짐.
+-> strings로 한번 봐보자. (Vide, VideoHandler, MPEG-4)
+-> MP4로 추정 (시그니처:  00 00 00 18 66 74 79 70)
+-> jpf (헤더:FF D8 FF E0 푸터:FF D9)
+
+# 풀이 #
+STEP 1) Hxd로 파일 구조 분석 (푸터 이후로 카빙함)
+STEP 2) mp4 파일있길래 실행해봄 -> 의미 없는 영상
+STEP 3) 해당 동영상 파일 안에 또 다른 동영상 있을 것이라 생각
+STEP 4) Dae-mmf-parser로 분석해보니 mdat 뒤에 또 다른 구조 있음
+STEP 5) 이 놈 이후로 카빙해서 kmplayer로 실행해보니 flag 나옴.
+
+*깨달은 점
+1. mp4의 파일 구조
+-> ftyp, moov, free, mdat으로 이루어지고 (mdat 뒤에 무언가 있다면 의심해야함)
+-> 각각은 박스로 이루어짐
+
+2. 분석 툴을 쓰는게 더 효율적.
