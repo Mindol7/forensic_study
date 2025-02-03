@@ -1,0 +1,138 @@
+### KAPE ###
+-> Eric Zimmerman의 도구들을 하나로 통합해서 이용할 수 있는 수집 및 분석 도구
+-> 포렌식 아티팩트를 수집하고 분석하는 일련의 과정을 자동화할 수 있고, 원하는 분석 행위만을 빠르게 수행 가능.
+-> 커스텀 가능.
+
+"wget 링크 -OutFile 저장경로"
+
+".\Get-KAPEUpdate.ps1"
+
+*실행 정책 변경
+STEP 1) Get-ExecutionPolicy로 현재 실행 정책 확인 
+-> Restricted면 제한된거
+
+STEP 2) Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted
+-> 영구적으로 실행 정책 제한 해제
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Unrestricted
+-> 현재 세션에서만 제한 해제 
+
+
+# KAPE 폴더의 구성
+1. Targets: 수집 대상을 지정하는 폴더; tkape라는 확장자 파일로 수집 대상을 지정할 수 있음
+2. Modules: 분석 방법을 지정하는 폴더; mkape라는 확장자 파일을 통해 분석 도구와 커맨드를 지정할 수 있음
+3. Get-KAPEUpdate.ps1: KAPE를 최신 버전으로 업데이트할 수 있는 PowerShell 스크립트
+4. kape.exe: KAPE CLI 도구
+5. gkape.exe: KAPE GUI 도구\
+
+## 수집 자동화 ##
+-> KAPE는 기본적으로 마운트된 드라이브로부터 데이터 수집
+-> Arsenal Image Mounter를 사용해 디스크 이미지 마운트 수행
+
+STEP 1) $LogFile, $MFT, Prefetch, RegistryHives, USBDevicesLogs를 선택하고 Execute 버튼 누름
+1. Target source: 수집할 경로; 디스크 이미지가 마운트된 경로를 선택
+2. Target destination: 수집된 아티팩트가 저장될 경로
+3. Flush: 수집 이전에 Target destination 폴더를 초기화하고 실행할지 여부
+4. Add %d, %m: 수집 폴더에 날짜와 기기 이름을 추가할지 여부
+5. Process VSCs: Volume Shadow Copys에 있는 데이터를 함께 수집할 지 여부
+6. Deduplicate: SHA-1 해시를 기반으로 중복된 파일을 제거
+
+-> 약 15초 정도에 수집 가능
+
+# tkape #
+-> KAPE에서 수집하는 파일의 목록을 Target이라고 함.
+-> .tkape라는 확장자의 파일을 작성해야함
+-> KAPE\Target에서 .tkape 확장자를 수정하여 제어 가능.
+
+
+Description: $MFT, Event Logs, Prefetch
+Author: MinhyukCho
+Version: 1.0
+Id: d95784d9-bd1c-472b-aeef-de5d9ecc7abc
+RecreateDirectories: true
+Targets:
+    -
+        Name: Event logs Win7+
+        Category: EventLogs
+        Path: C:\Windows\System32\winevt\logs\
+        FileMask: '*.evtx'
+    -
+        Name: Prefetch
+        Category: Prefetch
+        Path: C:\Windows\prefetch\
+        FileMask: '*.pf'
+    -
+        Name: $MFT
+        Category: FileSystem
+        Path: C:\
+        FileMask: $MFT
+
+-> 위와 같이 원하는 아티팩트 수집하는 tkape 직접 작성도 가능.
+
+	Name: $MFT
+        Category: FileSystem
+        Path: $MFT.tkape
+
+-> 이미 존재하는 tkape가 존재하는 경우 이름만 써주면됨. (Compound Targets)
+
+# 수집 고도화 #
+-> 포렌식 목적에 따라 수집해야 할 아티팩트 목록이 달라짐
+
+Ex) 기밀 유출 사건 수사의 경우 ..
+1. 브라우저 아티팩트: 브라우저를 통한 업로드, 다운로드 가능성
+2. $UsnJrnl, $LogFile: 파일의 이동이나 삭제 로그
+3. 이메일 프로그램: Outlook 등 이메일 프로그램 설치 흔적, 데이터베이스 파일
+4. 레지스트리: USB 등 저장장치 연결 흔적
+5. 이벤트 로그: 원격 접속 흔적
+
+*일반적으로 수집되는 아티팩트
+1. $MFT: 파일시스템 구조 확인
+2. $LogFile: 파일시스템 내 파일 생성, 이동, 삭제
+3. $UsnJrnl: 파일시스템 내 파일 생성, 이동, 삭제
+4. Event Logs: 시스템 이벤트 기록, 대부분의 경우 하나 이상의 이벤트 로그에 기록을 남김
+5. Prefetch: 응용프로그램 실행 기록
+6. Registry: 레지스트리 하이브. 레지스트리 내에 Shellbags, MUICache, SRUM 등 다양한 세부 아티팩트도 존재하기에 반드시 수집해야함
+7. RecycleBin: 휴지통 흔적
+8. setupapi: USB등 장치 연결 흔적
+9. 브라우저 아티팩트: Chrome, Edge 등 주요 브라우저 History 등
+10. 자동 실행: 시스템 부팅 시 자동 실행되는 프로그램 및 스크립트
+
+-> 나열된 아티팩트를 수집하는 tkape를 수집 전에 미리 작성해두고, 각 사건에 맞춰 적절히 수정해 이용하면 효과적임.
+
+## 분석 자동화 ##
+-> 분석을 수행하는 각각의 단위: Module (수집한 파일을 분석할 수 있는 도구와 그 명령어)
+-> 수집한 아티팩트에 대한 분석 모듈을 Use Module Options에서 선택하면됨.
+-> 없는 경우 직접 설치하여 'KAPE\Modules\bin' 경로에 실행 파일 넣으면됨.
+-> 반복적인 이티팩트 분석을 자동화 시킬 수 있다는 점이 매우 편함
+
+Description: 'NTFS Log Tracker: process $LogFile files'
+Category: FileSystem
+Author: Mindol
+Version: 1.0
+Id: 03939a50-0325-49f0-8cad-1f35c083f440
+BinaryUrl: https://sites.google.com/site/forensicnote/ntfs-log-tracker/NTFS Log Tracker v1.71 CMD.zip
+ExportFormat: sqlite3
+FileMask: $LogFile
+Processors:
+    -
+        Executable: NTFS Log Tracker v1.8\NTFS_Log_Tracker.exe
+        CommandLine: -l %sourceFile% -o %destinationDirectory%
+        ExportFormat: sqlite3
+    -
+        Executable: NTFS Log Tracker v1.8\NTFS_Log_Tracker.exe
+        CommandLine: -l %sourceFile% -o %destinationDirectory% -c
+        ExportFormat: csv
+
+# Documentation
+# https://sites.google.com/site/forensicnote/ntfs-log-tracker
+
+-> 위와 같이 mkape 작성하여 사용 가능
+
+# mkape #
+-> 분석 프로그램과 분석 커맨드를 설정해 두어 수집한 아티팩트와 자동으로 연결할 수 있게 해줌
+-> 커스텀 자동화 분석 시스템 개발 가능
+-> %sourceFile% 경로에서 분석 대상 파일을 검색하는 동작; 하위 폴더를 재귀적으로 모두 탐색 후 FileMask를 적용함 
+-> FileMask를 엄격하게 지정해놓아서 분석 대상 파일이 되도록함.
+
+## 마무리 ##
+-> KAPE를 통해 반복 작업은 자동화하고 집중이 필요한 곳에 에너지를 더 쏟을 수 있음.
